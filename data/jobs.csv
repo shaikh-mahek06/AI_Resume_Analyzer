@@ -1,0 +1,11 @@
+role,skills
+Data Analyst,"python, sql, excel, tableau"
+Business Analyst,"sql, excel, power bi, communication"
+Data Scientist,"python, statistics, machine learning, sql"
+ML Engineer,"python, machine learning, tensorflow, docker"
+Data Engineer,"python, sql, spark, airflow"
+BI Developer,"sql, power bi, dax, data modeling"
+AI Engineer,"python, deep learning, pytorch, cloud"
+Backend Developer,"python, django, api, postgresql"
+Cloud Engineer,"aws, docker, kubernetes, terraform"
+Analytics Engineer,"sql, dbt, python, data warehousing"
