@@ -4,17 +4,24 @@ from utils.llm_client import LLMClient
 
 # ================= PROMPT =================
 RESUME_IMPROVEMENT_PROMPT = """
-Rewrite the resume into a clean, ATS-friendly format.
+Rewrite the resume into a clean, ATS-friendly format tailored to the job description.
 
 Requirements:
-- Convert into bullet points
+- Preserve all real experience and achievements from the original resume
+- Rewrite bullet points to highlight quantifiable achievements and results
+- Tailor language and keywords to match the job description
 - Use strong action verbs (Developed, Built, Implemented, etc.)
-- Do NOT invent anything
+- Do NOT invent anything — only enhance what's already there
 - Keep it concise and structured
 - Improve grammar and clarity
 
+Job Description:
+{job_description}
+
 Return ONLY improved resume text.
 """.strip()
+
+RESUME_IMPROVEMENT_PROMPT = "You are a professional resume writer. Rewrite the following resume to be ATS-optimized and tailored to this job description. Preserve all real information: actual job titles, company names, dates, education, and projects from the original resume. Do not invent or hallucinate any information. Improve the bullet points to include action verbs and quantified achievements where the original hints at them. Output only the improved resume text, no commentary."
 
 
 # ================= CLEAN TEXT =================
@@ -186,13 +193,13 @@ Email | Phone | Location | LinkedIn | GitHub
 
 
 # ================= LLM =================
-def improve_resume_text(resume_text: str, llm_client: LLMClient | None = None) -> str:
+def improve_resume_text(resume_text: str, job_description: str = '', llm_client: LLMClient | None = None) -> str:
     if not resume_text.strip():
         raise ValueError("Resume text empty")
 
     client = llm_client or LLMClient()
 
-    prompt = f"{RESUME_IMPROVEMENT_PROMPT}\n\nResume:\n{resume_text}"
+    prompt = f"{RESUME_IMPROVEMENT_PROMPT}\n\nResume:\n{resume_text}\n\nJob Description:\n{job_description}"
 
     result = client.generate_text(prompt)
 

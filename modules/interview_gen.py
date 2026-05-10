@@ -6,13 +6,13 @@ from utils.llm_client import LLMClient
 
 
 INTERVIEW_QUESTION_PROMPT = """
-Generate exactly 10 technical interview questions for a {role}.
-The questions must:
-- Be strictly technical
-- Be relevant to real job scenarios
-- Cover tools, concepts, and problem-solving
-- Avoid behavioral or generic questions
-Return ONLY a Python list of 10 questions.
+Generate exactly 8 interview questions for a {role} position.
+The questions must include a mix of:
+- Technical questions (related to tools, concepts, problem-solving)
+- Behavioral questions (past experiences, teamwork, challenges)
+- Situational questions (hypothetical scenarios, decision-making)
+
+Return ONLY a Python list of exactly 8 questions.
 """.strip()
 
 
@@ -74,9 +74,9 @@ def _parse_questions(response_text: str) -> List[str]:
     return questions
 
 
-def _normalize_to_10(questions: List[str]) -> List[str]:
+def _normalize_to_8(questions: List[str]) -> List[str]:
     """
-    Normalize the questions list to exactly 10 items.
+    Normalize the questions list to exactly 8 items.
     Never raises error - pads with defaults or truncates as needed.
     """
     cleaned = [q.strip() for q in questions if q and isinstance(q, str) and q.strip()]
@@ -84,27 +84,25 @@ def _normalize_to_10(questions: List[str]) -> List[str]:
     # Default questions if none generated
     default_questions = [
         "Explain the difference between supervised and unsupervised learning.",
+        "Describe a challenging project you worked on and how you overcame obstacles.",
+        "How would you handle a situation where a project deadline is approaching and you're behind schedule?",
         "What is overfitting and how can you prevent it?",
+        "Tell me about a time when you had to learn a new technology quickly.",
+        "How would you approach debugging a complex issue in production?",
         "Describe the bias-variance tradeoff.",
-        "What are the key differences between SQL and NoSQL databases?",
-        "Explain the concept of RESTful APIs.",
-        "What is the purpose of version control systems?",
-        "Describe the machine learning pipeline steps.",
-        "What is data normalization and why is it important?",
-        "Explain the difference between classification and regression.",
-        "What are the best practices for data preprocessing?"
+        "Give an example of how you've collaborated with a team to solve a problem."
     ]
     
     if not cleaned:
         return default_questions
     
-    # Pad with default questions if less than 10
-    while len(cleaned) < 10:
+    # Pad with default questions if less than 8
+    while len(cleaned) < 8:
         idx = len(cleaned) % len(default_questions)
         cleaned.append(default_questions[idx])
     
-    # Truncate to exactly 10
-    return cleaned[:10]
+    # Truncate to exactly 8
+    return cleaned[:8]
 
 
 def generate_interview_questions(
@@ -113,8 +111,8 @@ def generate_interview_questions(
     llm_client: LLMClient | None = None,
 ) -> List[str]:
     """
-    Generate exactly 10 technical interview questions using the LLM API.
-    Never raises error for count mismatch - normalizes to 10 questions.
+    Generate exactly 8 interview questions using the LLM API.
+    Never raises error for count mismatch - normalizes to 8 questions.
     """
     cleaned_role = job_role.strip()
     if not cleaned_role:
@@ -127,12 +125,12 @@ def generate_interview_questions(
         response_text = client.generate_text(prompt).strip()
     except Exception:
         # Return defaults on any LLM error
-        return _normalize_to_10([])
+        return _normalize_to_8([])
 
     if not response_text:
-        return _normalize_to_10([])
+        return _normalize_to_8([])
 
     questions = _parse_questions(response_text)
     
-    # Normalize to exactly 10 - never raises error
-    return _normalize_to_10(questions)
+    # Normalize to exactly 8 - never raises error
+    return _normalize_to_8(questions)
