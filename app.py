@@ -2,6 +2,14 @@ from io import BytesIO
 import streamlit as st
 
 try:
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel
+except ImportError:
+    FastAPI = None
+    HTTPException = None
+    BaseModel = object
+
+try:
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
 except:
@@ -13,10 +21,82 @@ from modules.interview_eval import evaluate_interview_answer
 from modules.interview_gen import generate_interview_questions
 from modules.job_api import fetch_jobs
 from modules.resume_improver import improve_resume_text, clean_resume_text, generate_latex_resume
-from utils.parser import extract_text_from_pdf
+from modules.ats_scorer import calculate_ats_score
+from utils.parser import extract_resume_text
 from utils.skill_extractor import extract_skills
 
+try:
+    from career_roadmap import (
+        certification_engine,
+        project_recommender,
+        resources_db,
+        roadmap_generator,
+        role_requirements,
+        skills_analyzer,
+    )
+    from career_roadmap.certification_engine import recommend_certifications
+    from career_roadmap.project_recommender import recommend_projects
+    from career_roadmap.resources_db import LEARNING_RESOURCES
+    from career_roadmap.roadmap_generator import generate_roadmap
+    from career_roadmap.role_requirements import ROLE_REQUIREMENTS
+    from career_roadmap.skills_analyzer import analyze_skill_gap
+except ImportError:
+    certification_engine = None
+    project_recommender = None
+    resources_db = None
+    roadmap_generator = None
+    role_requirements = None
+    skills_analyzer = None
+    recommend_certifications = None
+    recommend_projects = None
+    LEARNING_RESOURCES = {}
+    generate_roadmap = None
+    ROLE_REQUIREMENTS = {}
+    analyze_skill_gap = None
+
 # ─────────────────────────── HELPER FUNCTION ───────────────────────────
+if FastAPI is not None:
+    api = FastAPI(title="CareerLens API")
+
+    class RoadmapRequest(BaseModel):
+        resume: str
+        target_role: str
+
+    def _resources_for_skills(skills):
+        skill_set = set(skills)
+        return {
+            skill: resources
+            for skill, resources in LEARNING_RESOURCES.items()
+            if skill.lower() in skill_set
+        }
+
+    def _target_skills_for_role(target_role):
+        role = target_role.strip().lower()
+        for known_role, skills in ROLE_REQUIREMENTS.items():
+            if known_role.lower() == role:
+                return known_role, skills
+        return None, None
+
+    @api.post("/generate-roadmap")
+    def generate_career_roadmap(payload: RoadmapRequest):
+        target_role, target_skills = _target_skills_for_role(payload.target_role)
+        if target_skills is None:
+            raise HTTPException(status_code=400, detail="Unsupported target_role")
+
+        skill_analysis = analyze_skill_gap(payload.resume, target_skills)
+        missing_skills = skill_analysis["missing_skills"]
+
+        return {
+            "skill_analysis": skill_analysis,
+            "roadmap": generate_roadmap(missing_skills, target_role),
+            "projects": recommend_projects(target_role, missing_skills),
+            "certifications": recommend_certifications(target_role),
+            "learning_resources": _resources_for_skills(missing_skills),
+        }
+else:
+    api = None
+
+
 def get_clean_skills(skills):
     """Ensure skills is always a clean list of strings."""
     if not isinstance(skills, list):
@@ -235,9 +315,9 @@ if "resume_text" not in st.session_state:
     up_col, jd_col = st.columns(2)
 
     with up_col:
-        uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"], key="resume_uploader")
+        uploaded_file = st.file_uploader("Upload Resume (PDF/DOCX)", type=["pdf", "docx"], key="resume_uploader")
         if uploaded_file is not None:
-            raw = extract_text_from_pdf(uploaded_file)
+            raw = extract_resume_text(uploaded_file, uploaded_file.name)
             st.session_state["resume_text"] = raw
             st.session_state["skills"] = extract_skills(raw)
             st.session_state["job_description"] = st.session_state.get("job_description", "")
@@ -260,14 +340,8 @@ if "resume_text" not in st.session_state:
         with st.spinner("Analysing your resume against the job description…"):
             res = calculate_ats_score(
                 st.session_state["resume_text"],
-                st.session_state["job_description"]
+                st.session_state["job_description"],
             )
-            if not isinstance(res.get("matched_skills"), list):
-                res["matched_skills"] = []
-            if not isinstance(res.get("missing_skills"), list):
-                res["missing_skills"] = []
-            res["matched_skills"] = [str(s).strip() for s in res.get("matched_skills", []) if str(s).strip()]
-            res["missing_skills"] = [str(s).strip() for s in res.get("missing_skills", []) if str(s).strip()]
             st.session_state["result"] = res
 
         if st.session_state.get("result"):
@@ -282,7 +356,7 @@ if "resume_text" not in st.session_state:
     elif has_resume and not has_jd:
         st.info("Paste a job description and click Analyse to see your ATS score.")
     elif not has_resume:
-        st.info("Upload your resume PDF to get started.")
+        st.info("Upload your resume PDF or DOCX to get started.")
 
 text = st.session_state.get("resume_text", "")
 skills = get_clean_skills(st.session_state.get("skills", []))
